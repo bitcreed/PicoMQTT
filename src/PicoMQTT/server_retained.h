@@ -16,8 +16,8 @@ protected:
         const std::vector<uint8_t> payload;
         const uint8_t qos;
 
-        RetainedMessage(const std::vector<uint8_t>& payload_data, uint8_t qos_level)
-            : payload(payload_data), qos(qos_level) {}
+        RetainedMessage(std::vector<uint8_t>&& payload_data, uint8_t qos_level)
+            : payload(std::move(payload_data)), qos(qos_level) {}
     };
 
     std::unordered_map<std::string, RetainedMessage> retained_messages;
@@ -58,7 +58,7 @@ protected:
             if (payload.empty()) {
                 retained_messages.erase(topic);
             } else {
-                retained_messages.insert_or_assign(topic, RetainedMessage(payload, qos));
+                retained_messages.insert_or_assign(topic, RetainedMessage(std::move(payload), qos));
             }
         }
         BaseServer::on_message(topic, packet);
