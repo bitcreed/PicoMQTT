@@ -13,8 +13,8 @@ public:
 protected:
     using ClientType = typename BaseServer::Client;
     struct RetainedMessage {
-        std::vector<uint8_t> payload;
-        uint8_t qos;
+        const std::vector<uint8_t> payload;
+        const uint8_t qos;
 
         RetainedMessage(const std::vector<uint8_t>& payload_data, uint8_t qos_level)
             : payload(payload_data), qos(qos_level) {}
