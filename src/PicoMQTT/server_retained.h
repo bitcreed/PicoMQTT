@@ -1,5 +1,6 @@
 #pragma once
 #include "server.h"
+#include <Arduino.h>
 #include <unordered_map>
 #include <vector>
 
@@ -20,7 +21,7 @@ protected:
             : payload(std::move(payload_data)), qos(qos_level) {}
     };
 
-    std::unordered_map<std::string, RetainedMessage> retained_messages;
+    std::unordered_map<String, RetainedMessage> retained_messages;
 
     void on_subscribe(const char* client_id, const char* topic) override {
         TRACE_FUNCTION
