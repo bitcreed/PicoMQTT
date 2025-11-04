@@ -1,8 +1,19 @@
 #pragma once
+
 #include "server.h"
 #include <Arduino.h>
+#include <functional>
 #include <unordered_map>
 #include <vector>
+
+namespace std {
+template <>
+struct hash<String> {
+    size_t operator()(const String& key) const {
+        return hash<std::string>{}(std::string(key.c_str(), key.length()));
+    }
+};
+}
 
 namespace PicoMQTT {
 
@@ -12,43 +23,56 @@ public:
     using BaseServer::BaseServer;
 
 protected:
-    using ClientType = typename BaseServer::Client;
+    // Retained message struct
     struct RetainedMessage {
-        const std::vector<uint8_t> payload;
-        const uint8_t qos;
+        public:
+            RetainedMessage() = delete;
+            RetainedMessage(const std::vector<uint8_t> && payload_data, uint8_t qos_level)
+                : payload(std::move(payload_data)), qos(qos_level) {}
 
-        RetainedMessage(std::vector<uint8_t>&& payload_data, uint8_t qos_level)
-            : payload(std::move(payload_data)), qos(qos_level) {}
+        private:
+            std::vector<uint8_t> payload;
+            uint8_t qos;
     };
 
-    std::unordered_map<String, RetainedMessage> retained_messages;
+    std::unordered_map<String, RetainedMessage> retained_messages; // topic → retained message
 
-    void on_subscribe(const char* client_id, const char* topic) override {
-        TRACE_FUNCTION
-        BaseServer::on_subscribe(client_id, topic);
-        for (auto& client_ptr : this->clients) {
-            if (strcmp(client_ptr->get_client_id(), client_id) == 0) {
-                for (auto& retained : retained_messages) {
-                    const auto& retained_topic = retained.first;
-                    const char* ret_topic = retained_topic.c_str();
-                    const auto& retained_msg = retained.second;
-                    if (topic_matches(topic, ret_topic)) {
-                        auto pub = Publish(*this, PrintMux(client_ptr->get_print()), ret_topic,
+    // Client mixin to handle sending retained messages on subscribe
+    template <typename BaseClient>
+    class ClientRetainedMixin : public BaseClient {
+    public:
+        using BaseClient::BaseClient;
+        using BaseClient::topic_matches;
+
+        virtual void on_subscribe(IncomingPacket & packet) override {
+            BaseClient::on_subscribe(packet);
+
+            // After subscribing, send retained messages for matched topics
+            for (const auto & sub : this->subscriptions) {
+                const char * topic_filter = sub.c_str();
+                for (auto & retained : this->server.retained_messages) {
+                    const char * ret_topic = retained.first.c_str();
+                    const auto & retained_msg = retained.second;
+                    if (topic_matches(topic_filter, ret_topic)) {
+                        auto pub = Publish(*this, PrintMux(this->get_print()), ret_topic,
                                            retained_msg.payload.size(), 0, true, 0);
                         pub.write(retained_msg.payload.data(), retained_msg.payload.size());
                         pub.send();
                     }
                 }
-                break;
             }
         }
-    }
+    };
 
-    void on_message(const char* topic, IncomingPacket& packet) override {
+    using Client = ClientRetainedMixin<typename BaseServer::Client>;
+
+    // Override Server::on_message to store retained messages
+    void on_message(const char * topic, IncomingPacket & packet) override {
         TRACE_FUNCTION
         const bool retain = packet.get_flags() & 0b1;
         if (retain) {
             const uint8_t qos = (packet.get_flags() >> 1) & 0b11;
+
             std::vector<uint8_t> payload;
             payload.reserve(packet.get_remaining_size());
             uint8_t byte;
@@ -62,8 +86,9 @@ protected:
                 retained_messages.insert_or_assign(topic, RetainedMessage(std::move(payload), qos));
             }
         }
+
         BaseServer::on_message(topic, packet);
     }
 };
 
-}
+} // namespace PicoMQTT

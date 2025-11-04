@@ -237,6 +237,7 @@ void Server::Client::on_subscribe(IncomingPacket & subscribe) {
 
     for (const String & topic : subscribed_topics) {
         server.on_subscribe(client_id.c_str(), topic.c_str());
+        this->on_subscribed(topic);
     }
 }
 

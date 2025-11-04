@@ -29,7 +29,7 @@ def consumer(barrier, conn, host, expected_messages, timeout):
 
     client.connect(host)
     client.loop_start()
-    client.subscribe("benchmark")
+    client.subscribe("#")
     while total_messages < expected_messages:
         if first_message_time and total_messages >= 2:
             elapsed_time = time.time() - first_message_time
@@ -72,9 +72,12 @@ for consumer in consumers:
 # wait for all processes to connect
 barrier.wait()
 
+i = 0
+
 # fire messages
 while any(p.is_alive() for p in consumers):
-    client.publish("benchmark", message)
+    client.publish(f"benchmark/{i}", message, retain=True)
+    i += 1
 
 # wait for consumers
 for consumer in consumers:
