@@ -232,6 +232,8 @@ protected:
     virtual void on_subscribe(const char * client_id, const char * topic) {}
     virtual void on_unsubscribe(const char * client_id, const char * topic) {}
 
+    virtual void on_subscribed(Client & client, const char * topic_filter);
+
     bool set_subscribed(const char * topic);
 
     std::unique_ptr<ServerSocketInterface> server;

@@ -271,6 +271,8 @@ void Server::Client::on_subscribe(IncomingPacket & subscribe) {
     uint8_t suback_codes[(PICOMQTT_MAX_SUBSCRIPTIONS_PER_PACKET + 7) / 8] = {};
     size_t suback_codes_count = 0;
 
+    size_t new_subscriptions = 0;
+
     for (; subscribe.get_remaining_size(); ++suback_codes_count) {
         const size_t topic_size = subscribe.read_u16();
 
@@ -296,8 +298,18 @@ void Server::Client::on_subscribe(IncomingPacket & subscribe) {
                 on_protocol_violation();
                 return;
             }
+            bool repeated = false;
+            const Subscription * s = subscriptions;
+            for (size_t i = 0; i < new_subscriptions; ++i, s = s->next) {
+                if (s->topic == topic) {
+                    repeated = true;
+                    break;
+                }
+            }
             if (this->subscribe(topic)) {
-                server.on_subscribe(client_id.c_str(), topic);
+                if (!repeated) {
+                    ++new_subscriptions;
+                }
             } else {
                 suback_codes[suback_codes_count >> 3] |=
                     1 << (suback_codes_count & 7);
@@ -321,6 +333,14 @@ void Server::Client::on_subscribe(IncomingPacket & subscribe) {
         }
     }
     suback.send();
+
+    for (size_t i = new_subscriptions; i-- > 0;) {
+        const Subscription * s = subscriptions;
+        for (size_t j = 0; j < i; ++j) {
+            s = s->next;
+        }
+        server.on_subscribed(*this, s->topic.c_str());
+    }
 }
 
 void Server::Client::on_unsubscribe(IncomingPacket & unsubscribe) {
@@ -492,6 +512,11 @@ Publisher::Publish Server::begin_publish(const char * topic,
     TRACE_FUNCTION;
     set_subscribed(topic);
     return Publish(*this, print_mux, topic, payload_size);
+}
+
+void Server::on_subscribed(Client & client, const char * topic_filter) {
+    TRACE_FUNCTION;
+    on_subscribe(client.get_client_id(), topic_filter);
 }
 
 void Server::on_message(const char * topic, IncomingPacket & packet) {
