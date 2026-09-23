@@ -18,3 +18,4 @@
 
 #include "PicoMQTT/client.h"
 #include "PicoMQTT/server.h"
+#include "PicoMQTT/server_retained.h"

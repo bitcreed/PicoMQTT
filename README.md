@@ -12,6 +12,7 @@ Features:
 * Works in client and broker mode
 * Implements [MQTT 3.1.1](https://docs.oasis-open.org/mqtt/mqtt/v3.1.1/os/mqtt-v3.1.1-os.html)
 * Supports publishing and consuming of [arbitrary sized messages](#arbitrary-sized-messages)
+* Optional broker support for [retained messages](#retained-messages) (in-memory only, no persistence)
 * High performance -- the broker can deliver thousands of messages per second -- [see benchmarks](#benchmarks)
 * Works on [WiFi, Ethernet and more](#custom-server-and-client-types)
 * Supports connections over [websockets](#websocket-support)
@@ -21,7 +22,7 @@ Features:
 
 Limitations:
 * Client only supports MQTT QoS levels 0 and 1
-* Broker only supports MQTT QoS level 0, ignores will and retained messages.
+* Broker only supports MQTT QoS level 0, ignores will messages.  Retained messages are ignored unless [enabled](#retained-messages).
 * Currently only ESP8266 and ESP32 boards are supported
 
 
@@ -181,6 +182,35 @@ Notes:
 `PicoMQTT::ServerLocalSubscribe` has slightly worse performance and can be memory intensive, especially if large messages are published and subscribed to locally.  Therefore, it should only be used when really needed.  Moreover, it has one additional limitation: it's *subscription callbacks must not publish any messages* or it may cause a crash.
 
 Example available [here](examples/server_local_subscribe/server_local_subscribe.ino).
+
+### Retained messages
+
+By default, the broker ignores the retain flag of published messages.  To enable retained messages, wrap the server
+class in the `PicoMQTT::RetainedMessagesServer` template:
+
+```
+PicoMQTT::RetainedMessagesServer<PicoMQTT::Server> mqtt;
+// or
+PicoMQTT::RetainedMessagesServer<PicoMQTT::ServerLocalSubscribe> mqtt;
+```
+
+Retained messages are stored in memory when published with the retain flag set -- both by clients and locally using
+`publish` or `publish_P`.  They are sent to clients when they subscribe to a matching topic and passed to local
+callbacks when `subscribe` is called.  Publishing a retained message with an empty payload clears the retained message
+of the topic.
+
+Notes:
+* Retained messages are kept in RAM only and are lost on reboot.
+* Messages published with `begin_publish` are never retained.
+* At most `PICOMQTT_MAX_RETAINED_MESSAGES` messages (32 by default), each up to `PICOMQTT_MAX_RETAINED_MESSAGE_SIZE`
+  bytes (1024 by default), are stored.  Bigger messages and messages on new topics beyond the limit are still
+  delivered to subscribers, but not retained.  The limits can be tuned in [config.h](src/PicoMQTT/config.h).
+* Messages forwarded to already subscribed clients always have the retain flag cleared, as required by the MQTT
+  specification.  The flag is only set on retained messages sent in response to a new subscription.
+* Local callbacks receive matching retained messages before `subscribe` returns.  If a callback unsubscribes during
+  this replay, the remaining retained messages are passed to the next matching local subscription instead.
+
+Example available [here](examples/retained_messages/src/retained_messages.cpp).
 
 
 ## Last Will Testament messages
