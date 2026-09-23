@@ -202,8 +202,8 @@ of the topic.
 Notes:
 * Retained messages are kept in RAM only and are lost on reboot.
 * Messages published with `begin_publish` are never retained.
-* At most `PICOMQTT_MAX_RETAINED_MESSAGES` messages (32 by default), each up to `PICOMQTT_MAX_RETAINED_MESSAGE_SIZE`
-  bytes (1024 by default), are stored.  Bigger messages and messages on new topics beyond the limit are still
+* At most `PICOMQTT_MAX_RETAINED_MESSAGES` messages (16 by default), each up to `PICOMQTT_MAX_RETAINED_MESSAGE_SIZE`
+  bytes (256 by default), are stored.  Bigger messages and messages on new topics beyond the limit are still
   delivered to subscribers, but not retained.  The limits can be tuned in [config.h](src/PicoMQTT/config.h).
 * Messages forwarded to already subscribed clients always have the retain flag cleared, as required by the MQTT
   specification.  The flag is only set on retained messages sent in response to a new subscription.
